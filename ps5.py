@@ -1,8 +1,3 @@
-# 6.0001/6.00 Problem Set 5 - RSS Feed Filter
-# Name:
-# Collaborators:
-# Time:
-
 import feedparser
 import string
 import time
@@ -16,7 +11,7 @@ import pytz
 #-----------------------------------------------------------------------
 
 #======================
-# Code for retrieving and parsing
+# Code for retrieving and pars ing
 # Google and Yahoo News feeds
 # Do not change this code
 #======================
@@ -55,29 +50,30 @@ def process(url):
 # Problem 1
 
 # TODO: NewsStory
+
 class NewsStory(object):
-    def __init__(self,guid,title,description,link,pubdate):
+    def __init__(self, guid, title, description, link, pubdate):
         self.guid = guid
         self.title = title
         self.description = description
         self.link = link
         self.pubdate = pubdate
-    
+
     def get_guid(self):
         return self.guid
-    
+
     def get_title(self):
         return self.title
-    
+
     def get_description(self):
         return self.description
-    
+
     def get_link(self):
         return self.link
-    
+
     def get_pubdate(self):
         return self.pubdate
-    
+
 
 #======================
 # Triggers
@@ -90,50 +86,53 @@ class Trigger(object):
         for the given news item, or False otherwise.
         """
         # DO NOT CHANGE THIS!
-        
         raise NotImplementedError
 
 # PHRASE TRIGGERS
 
 # Problem 2
 # TODO: PhraseTrigger
+
 class PhraseTrigger(Trigger):
-    def __init__(self,phrase):
-        self.phrase = phrase
-    
-    def get_phrase(self):
-        return self.phrase
-    
-    def is_phrase_in (phrase,text):
-        phrase = phrase.lower()
-        for char in phrase:
-            if char in string.punctuation:
-                phrase = phrase.replace(char, '')
-        key_lst = phrase.split()
-        check_lst = []
-        condition = True      
-        for word in key_lst:
-            if word in text:
-                check_lst.append(word)
-                continue
-            else:
-                condition = False
-                return condition
-        if check_lst == key_lst:
-            return condition
+
+    def __init__(self, phrase):
+        self.phrase = phrase.lower()
+
+    def is_phrase_in(self, text):
+        text = text.lower()
+        for char in string.punctuation:
+            text = text.replace(char, ' ')
+        word_list = text.split(' ')
+        while '' in word_list:
+            word_list.remove('')
+        phrase_split = self.phrase.split()
+        test = []
+        for ph in phrase_split:
+            for i, word in enumerate(word_list):
+                if ph == word:
+                    test.append(i)
+        found = True
+        if len(test) < len(phrase_split):
+            return False
+        for i in range(len(test) - 1):
+            if test[i + 1] - test[i] != 1:
+                found = False
+        return found
+
 
 # Problem 3
 # TODO: TitleTrigger
+
 class TitleTrigger(PhraseTrigger):
-    def title_trigger(self):
-        if PhraseTrigger.is_phrase_in(phrase, title):
-            return True
-        else:
-            return False
+    def evaluate(self, story):
+        return self.is_phrase_in(story.get_title())
     
+
 # Problem 4
 # TODO: DescriptionTrigger
-
+class DescriptionTrigger(PhraseTrigger):
+    def evaluate(self, story):
+        return self.is_phrase_in(story.get_description())
 # TIME TRIGGERS
 
 # Problem 5
@@ -142,20 +141,55 @@ class TitleTrigger(PhraseTrigger):
 #        Input: Time has to be in EST and in the format of "%d %b %Y %H:%M:%S".
 #        Convert time from string to a datetime before saving it as an attribute.
 
+class TimeTrigger(Trigger):
+    def __init__(self, pubtime):
+        format = '%d %b %Y %H:%M:%S'
+        pubtime = datetime.strptime(pubtime, format)
+        pubtime = pubtime.replace(tzinfo=pytz.timezone("EST"))
+        self.pubtime = pubtime
+
 # Problem 6
 # TODO: BeforeTrigger and AfterTrigger
 
 
+class BeforeTrigger(TimeTrigger):
+    def evaluate(self, story):
+        return self.pubtime > story.get_pubdate().replace(tzinfo=pytz.timezone("EST"))
+
+class AfterTrigger(TimeTrigger):
+    def evaluate(self, story):
+        return self.pubtime < story.get_pubdate().replace(tzinfo=pytz.timezone("EST"))
+    
 # COMPOSITE TRIGGERS
 
 # Problem 7
 # TODO: NotTrigger
+class NotTrigger(Trigger):
+    def __init__(self, trigger):
+        self.trig = trigger
+
+    def evaluate(self, story):
+        return not self.trig.evaluate(story)
 
 # Problem 8
 # TODO: AndTrigger
+class AndTrigger(Trigger):
+    def __init__(self, trigger1, trigger2):
+        self.trig1 = trigger1
+        self.trig2 = trigger2
 
+    def evaluate(self, story):
+        return self.trig1.evaluate(story) and self.trig2.evaluate(story)
+    
 # Problem 9
 # TODO: OrTrigger
+class OrTrigger(Trigger):
+    def __init__(self, trigger1, trigger2):
+        self.trig1 = trigger1
+        self.trig2 = trigger2
+
+    def evaluate(self, story):
+        return self.trig1.evaluate(story) or self.trig2.evaluate(story)
 
 
 #======================
@@ -166,13 +200,18 @@ class TitleTrigger(PhraseTrigger):
 def filter_stories(stories, triggerlist):
     """
     Takes in a list of NewsStory instances.
-
     Returns: a list of only the stories for which a trigger in triggerlist fires.
     """
     # TODO: Problem 10
     # This is a placeholder
     # (we're just returning all the stories, with no filtering)
-    return stories
+    trig_stories = []
+    for story in stories:
+        for trig in triggerlist:
+            if trig.evaluate(story):
+                trig_stories.append(story)
+                break
+    return trig_stories
 
 
 
@@ -180,10 +219,10 @@ def filter_stories(stories, triggerlist):
 # User-Specified Triggers
 #======================
 # Problem 11
+
 def read_trigger_config(filename):
     """
     filename: the name of a trigger configuration file
-
     Returns: a list of trigger objects specified by the trigger configuration
         file.
     """
@@ -195,14 +234,30 @@ def read_trigger_config(filename):
         line = line.rstrip()
         if not (len(line) == 0 or line.startswith('//')):
             lines.append(line)
-
     # TODO: Problem 11
     # line is the list of lines that you need to parse and for which you need
     # to build triggers
-
-    print(lines) # for now, print it so you see what it contains!
-
-
+    trig_dict = {}
+    trig_list = []
+    for i in range(len(lines)):
+        trig = lines[i].split(',')
+        if trig[1] == 'TITLE':
+            trig_dict[trig[0]] = TitleTrigger(trig[2])
+        elif trig[1] == 'DESCRIPTION':
+            trig_dict[trig[0]] = DescriptionTrigger(trig[2])
+        elif trig[1] == 'AFTER':
+            trig_dict[trig[0]] = AfterTrigger(trig[2])
+        elif trig[1] == 'BEFORE':
+            trig_dict[trig[0]] = BeforeTrigger(trig[2])
+        elif trig[1] == 'NOT':
+            trig_dict[trig[0]] = NotTrigger(trig[2])
+        elif trig[1] == 'AND':
+            trig_dict[trig[0]] = AndTrigger(trig_dict[trig[2]], trig_dict[trig[3]])
+        elif trig[0] == 'ADD':
+            for x in range(1, len(trig)):
+                trig_list.append(trig_dict[trig[x]])
+    return trig_list
+            
 
 SLEEPTIME = 120 #seconds -- how often we poll
 
@@ -217,16 +272,16 @@ def main_thread(master):
         triggerlist = [t1, t4]
 
         # Problem 11
-        # TODO: After implementing read_trigger_config, uncomment this line 
-        # triggerlist = read_trigger_config('triggers.txt')
-        
+        # TODO: After implementing read_trigger_config, uncomment this line
+        triggerlist = read_trigger_config('triggers.txt')
+
         # HELPER CODE - you don't need to understand this!
         # Draws the popup window that displays the filtered stories
         # Retrieves and filters the stories from the RSS feeds
         frame = Frame(master)
         frame.pack(side=BOTTOM)
         scrollbar = Scrollbar(master)
-        scrollbar.pack(side=RIGHT,fill=Y)
+        scrollbar.pack(side=RIGHT, fill=Y)
 
         t = "Google & Yahoo Top News"
         title = StringVar()
@@ -261,7 +316,6 @@ def main_thread(master):
             list(map(get_cont, stories))
             scrollbar.config(command=cont.yview)
 
-
             print("Sleeping...")
             time.sleep(SLEEPTIME)
 
@@ -275,4 +329,3 @@ if __name__ == '__main__':
     t = threading.Thread(target=main_thread, args=(root,))
     t.start()
     root.mainloop()
-
